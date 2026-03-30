@@ -221,37 +221,3 @@ func TestIsLocalhost(t *testing.T) {
 	}
 }
 
-func TestNodeLookupLogic(t *testing.T) {
-	// Test the node lookup logic (same logic used in isNodeAllowedForService).
-	testHosts := []ServiceHostInfo{
-		{StableNodeID: "n123456CNTRL"},
-		{StableNodeID: "n789012CNTRL"},
-	}
-
-	tests := []struct {
-		name     string
-		nodeID   string
-		hosts    []ServiceHostInfo
-		expected bool
-	}{
-		{"node in list", "n123456CNTRL", testHosts, true},
-		{"node not in list", "n999999CNTRL", testHosts, false},
-		{"empty list", "n123456CNTRL", nil, false},
-		{"empty node ID", "", testHosts, false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			found := false
-			for _, host := range tt.hosts {
-				if host.StableNodeID == tt.nodeID {
-					found = true
-					break
-				}
-			}
-			if found != tt.expected {
-				t.Errorf("expected %v, got %v", tt.expected, found)
-			}
-		})
-	}
-}

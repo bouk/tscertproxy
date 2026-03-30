@@ -37,48 +37,14 @@ func TestConfigValidation(t *testing.T) {
 			expectError: true,
 		},
 		{
-			name: "valid config with services API",
+			name: "valid config with tailnet",
 			cfg: Config{
-				Listen:                "127.0.0.1:30800",
-				Domains:               []string{"node.example.com"},
-				DNSProvider:           "cloudflare",
-				TailscaleClientID:     "client-id",
-				TailscaleClientSecret: "client-secret",
-				Tailnet:               "example.com",
+				Listen:      "127.0.0.1:30800",
+				Domains:     []string{"node.example.com"},
+				DNSProvider: "cloudflare",
+				Tailnet:     "example.com",
 			},
-			expectError: false,
-		},
-		{
-			name: "partial services API config - missing tailnet",
-			cfg: Config{
-				Listen:                "127.0.0.1:30800",
-				Domains:               []string{"node.example.com"},
-				DNSProvider:           "cloudflare",
-				TailscaleClientID:     "client-id",
-				TailscaleClientSecret: "client-secret",
-			},
-			expectError: true,
-		},
-		{
-			name: "partial services API config - missing client secret",
-			cfg: Config{
-				Listen:            "127.0.0.1:30800",
-				Domains:           []string{"node.example.com"},
-				DNSProvider:       "cloudflare",
-				TailscaleClientID: "client-id",
-				Tailnet:           "example.com",
-			},
-			expectError: true,
-		},
-		{
-			name: "partial services API config - missing client id",
-			cfg: Config{
-				Listen:                "127.0.0.1:30800",
-				Domains:               []string{"node.example.com"},
-				DNSProvider:           "cloudflare",
-				TailscaleClientSecret: "client-secret",
-				Tailnet:               "example.com",
-			},
+			// tailnet without TS auth env vars is an error
 			expectError: true,
 		},
 	}
@@ -97,53 +63,63 @@ func TestConfigValidation(t *testing.T) {
 }
 
 func TestServicesAPIEnabled(t *testing.T) {
+	clearTSEnv := func() {
+		os.Unsetenv("TS_CLIENT_ID")
+		os.Unsetenv("TS_CLIENT_SECRET")
+		os.Unsetenv("TS_API_KEY")
+		os.Unsetenv("TS_IDENTITY_FEDERATION_PROVIDER")
+	}
+
 	tests := []struct {
 		name     string
 		cfg      Config
+		env      map[string]string
 		expected bool
 	}{
 		{
-			name: "all credentials provided",
-			cfg: Config{
-				TailscaleClientID:     "client-id",
-				TailscaleClientSecret: "client-secret",
-				Tailnet:               "example.com",
-			},
+			name:     "oauth credentials with tailnet",
+			cfg:      Config{Tailnet: "example.com"},
+			env:      map[string]string{"TS_CLIENT_ID": "id", "TS_CLIENT_SECRET": "secret"},
 			expected: true,
 		},
 		{
-			name:     "no credentials",
+			name:     "api key with tailnet",
+			cfg:      Config{Tailnet: "example.com"},
+			env:      map[string]string{"TS_API_KEY": "key"},
+			expected: true,
+		},
+		{
+			name:     "identity federation with tailnet",
+			cfg:      Config{Tailnet: "example.com"},
+			env:      map[string]string{"TS_IDENTITY_FEDERATION_PROVIDER": "tailscale", "TS_CLIENT_ID": "id"},
+			expected: true,
+		},
+		{
+			name:     "no tailnet",
 			cfg:      Config{},
+			env:      map[string]string{"TS_CLIENT_ID": "id", "TS_CLIENT_SECRET": "secret"},
 			expected: false,
 		},
 		{
-			name: "missing client id",
-			cfg: Config{
-				TailscaleClientSecret: "client-secret",
-				Tailnet:               "example.com",
-			},
+			name:     "tailnet but no credentials",
+			cfg:      Config{Tailnet: "example.com"},
+			env:      map[string]string{},
 			expected: false,
 		},
 		{
-			name: "missing client secret",
-			cfg: Config{
-				TailscaleClientID: "client-id",
-				Tailnet:           "example.com",
-			},
-			expected: false,
-		},
-		{
-			name: "missing tailnet",
-			cfg: Config{
-				TailscaleClientID:     "client-id",
-				TailscaleClientSecret: "client-secret",
-			},
+			name:     "no config at all",
+			cfg:      Config{},
 			expected: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			clearTSEnv()
+			defer clearTSEnv()
+			for k, v := range tt.env {
+				os.Setenv(k, v)
+			}
 			if got := tt.cfg.ServicesAPIEnabled(); got != tt.expected {
 				t.Errorf("ServicesAPIEnabled() = %v, want %v", got, tt.expected)
 			}

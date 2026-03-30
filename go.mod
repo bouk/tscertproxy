@@ -5,6 +5,7 @@ go 1.25.5
 require (
 	github.com/go-acme/lego/v4 v4.31.0
 	tailscale.com v1.94.1
+	tailscale.com/client/tailscale/v2 v2.9.0
 )
 
 require (
@@ -183,6 +184,7 @@ require (
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/tailscale/go-winio v0.0.0-20231025203758-c4f33415bf55 // indirect
+	github.com/tailscale/hujson v0.0.0-20221223112325-20486734a56a // indirect
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.3.28 // indirect
 	github.com/tjfoc/gmsm v1.4.1 // indirect
 	github.com/transip/gotransip/v6 v6.26.1 // indirect

@@ -17,7 +17,7 @@ It uses Tailscale's `whois` API to identify which machine is making the request,
 
 ### Services Authorization
 
-In addition to hostname-based authorization, tscertproxy supports **Tailscale services-based authorization**. When configured with Tailscale OAuth credentials, nodes can request certificates for [Tailscale services](https://tailscale.com/kb/1390/services) they are approved to host.
+In addition to hostname-based authorization, tscertproxy supports **Tailscale services-based authorization**. When configured with Tailscale API credentials, nodes can request certificates for [Tailscale services](https://tailscale.com/kb/1390/services) they are approved to host.
 
 For example, if a node is approved to host the service `svc:myapp`, it can request a certificate for `myapp.node.example.com` regardless of its hostname.
 
@@ -64,14 +64,22 @@ tscertproxy -dns-provider cloudflare -domains node.example.com
 | `-dns-provider` | `TSCERTPROXY_DNS_PROVIDER` | DNS provider name (e.g., `cloudflare`, `route53`) |
 | `-debug` | `TSCERTPROXY_DEBUG` | Enable debug logging |
 | `-disable-hostname` | `TSCERTPROXY_DISABLE_HOSTNAME` | Disable hostname-based authorization (only allow services-based) |
-| `-ts-client-id` | `TSCERTPROXY_TS_CLIENT_ID` | Tailscale OAuth client ID for services API |
-| `-ts-client-secret` | `TSCERTPROXY_TS_CLIENT_SECRET` | Tailscale OAuth client secret for services API |
 | `-tailnet` | `TSCERTPROXY_TAILNET` | Tailnet name (e.g., `example.com`) |
 | `-version` | | Show version information |
 
 Flags take precedence over environment variables.
 
-The `-ts-client-id`, `-ts-client-secret`, and `-tailnet` flags must all be provided together or all be omitted.
+### Tailscale API Authentication
+
+Services-based authorization requires `-tailnet` and one of the following authentication methods, configured via environment variables:
+
+| Method | Environment Variables | Description |
+|--------|----------------------|-------------|
+| Identity Federation | `TS_IDENTITY_FEDERATION_PROVIDER=tailscale` + `TS_CLIENT_ID` | Uses Tailscale identity federation with the local node's ID token. Optionally set `TS_IDENTITY_FEDERATION_AUDIENCE`. |
+| OAuth | `TS_CLIENT_ID` + `TS_CLIENT_SECRET` | Uses OAuth client credentials. |
+| API Key | `TS_API_KEY` | Uses a Tailscale API key. |
+
+Methods are checked in the order above; the first match wins.
 
 ### Example
 
@@ -82,21 +90,28 @@ export TSCERTPROXY_DNS_PROVIDER=cloudflare
 export CF_API_TOKEN=your-api-token
 tscertproxy
 
-# With Tailscale services authorization
+# With Tailscale services authorization (OAuth)
+export TS_CLIENT_ID=tskey-client-xxxxx
+export TS_CLIENT_SECRET=tskey-client-secret-xxxxx
 tscertproxy \
   -domains node.example.com \
   -dns-provider cloudflare \
-  -ts-client-id tskey-client-xxxxx \
-  -ts-client-secret tskey-client-secret-xxxxx \
+  -tailnet example.com
+
+# With Tailscale services authorization (identity federation)
+export TS_IDENTITY_FEDERATION_PROVIDER=tailscale
+export TS_CLIENT_ID=tskey-client-xxxxx
+tscertproxy \
+  -domains node.example.com \
+  -dns-provider cloudflare \
   -tailnet example.com
 
 # Services-only mode (disable hostname-based authorization)
+export TS_API_KEY=tskey-api-xxxxx
 tscertproxy \
   -domains node.example.com \
   -dns-provider cloudflare \
   -disable-hostname \
-  -ts-client-id tskey-client-xxxxx \
-  -ts-client-secret tskey-client-secret-xxxxx \
   -tailnet example.com
 ```
 

@@ -25,11 +25,8 @@ type Config struct {
 	// When true, only services-based authorization is used.
 	DisableHostname bool
 
-	// Tailscale API OAuth credentials for services authorization.
-	// When set, nodes can request certs for services they are allowed to host.
-	TailscaleClientID     string
-	TailscaleClientSecret string
-	Tailnet               string
+	// Tailnet name for Tailscale services authorization.
+	Tailnet string
 }
 
 // ParseConfig parses configuration from flags and environment variables.
@@ -41,8 +38,6 @@ func ParseConfig() (*Config, error) {
 	flag.StringVar(&cfg.DNSProvider, "dns-provider", os.Getenv("TSCERTPROXY_DNS_PROVIDER"), "DNS provider name, e.g. cloudflare, route53 (env: TSCERTPROXY_DNS_PROVIDER)")
 	flag.BoolVar(&cfg.Debug, "debug", envBool("TSCERTPROXY_DEBUG"), "Enable debug logging (env: TSCERTPROXY_DEBUG)")
 	flag.BoolVar(&cfg.DisableHostname, "disable-hostname", envBool("TSCERTPROXY_DISABLE_HOSTNAME"), "Disallow using the node's hostname as a subdomain (env: TSCERTPROXY_DISABLE_HOSTNAME)")
-	flag.StringVar(&cfg.TailscaleClientID, "ts-client-id", os.Getenv("TSCERTPROXY_TS_CLIENT_ID"), "Tailscale OAuth client ID for services API (env: TSCERTPROXY_TS_CLIENT_ID)")
-	flag.StringVar(&cfg.TailscaleClientSecret, "ts-client-secret", os.Getenv("TSCERTPROXY_TS_CLIENT_SECRET"), "Tailscale OAuth client secret for services API (env: TSCERTPROXY_TS_CLIENT_SECRET)")
 	flag.StringVar(&cfg.Tailnet, "tailnet", os.Getenv("TSCERTPROXY_TAILNET"), "Tailnet name, e.g. example.com or org name (env: TSCERTPROXY_TAILNET)")
 
 	var domains string
@@ -79,22 +74,37 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("DNS provider must be specified (-dns-provider or TSCERTPROXY_DNS_PROVIDER)")
 	}
 
-	// If any Tailscale API credential is provided, all must be provided.
-	hasClientID := c.TailscaleClientID != ""
-	hasClientSecret := c.TailscaleClientSecret != ""
-	hasTailnet := c.Tailnet != ""
-	if hasClientID || hasClientSecret || hasTailnet {
-		if !hasClientID || !hasClientSecret || !hasTailnet {
-			return fmt.Errorf("all Tailscale API options must be specified together: -ts-client-id, -ts-client-secret, -tailnet")
-		}
+	// Tailscale services authorization requires a tailnet and API credentials
+	// via environment variables (TS_CLIENT_ID/TS_CLIENT_SECRET, TS_API_KEY,
+	// or TS_IDENTITY_FEDERATION_PROVIDER + TS_CLIENT_ID).
+	if c.Tailnet != "" && !c.hasTailscaleAuth() {
+		return fmt.Errorf("tailnet specified but no Tailscale API credentials found; set TS_CLIENT_ID + TS_CLIENT_SECRET, TS_API_KEY, or TS_IDENTITY_FEDERATION_PROVIDER=tailscale + TS_CLIENT_ID")
 	}
 
 	return nil
 }
 
+// hasTailscaleAuth returns true if any Tailscale API auth env vars are set.
+func (c *Config) hasTailscaleAuth() bool {
+	clientID := os.Getenv("TS_CLIENT_ID")
+	clientSecret := os.Getenv("TS_CLIENT_SECRET")
+	apiKey := os.Getenv("TS_API_KEY")
+	idFedProvider := os.Getenv("TS_IDENTITY_FEDERATION_PROVIDER")
+
+	switch {
+	case idFedProvider == "tailscale" && clientID != "":
+		return true
+	case clientID != "" && clientSecret != "":
+		return true
+	case apiKey != "":
+		return true
+	}
+	return false
+}
+
 // ServicesAPIEnabled returns true if the Tailscale services API is configured.
 func (c *Config) ServicesAPIEnabled() bool {
-	return c.TailscaleClientID != "" && c.TailscaleClientSecret != "" && c.Tailnet != ""
+	return c.Tailnet != "" && c.hasTailscaleAuth()
 }
 
 // envOrDefault returns the environment variable value or a default.
