@@ -1,4 +1,4 @@
-module github.com/BuildMonumental/tscertproxy
+module github.com/bouk/tscertproxy
 
 go 1.25.5
 

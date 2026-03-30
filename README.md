@@ -31,7 +31,7 @@ Both authorization methods are checked in order:
 ### Build from Source
 
 ```bash
-go install github.com/BuildMonumental/tscertproxy@latest
+go install github.com/bouk/tscertproxy@latest
 ```
 
 ## Tailscale Service Setup
